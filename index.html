@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDXL Prompt Builder v0.5.1 Corrections</title>
+<style>
+:root{--bg:#f6f3ef;--card:#fffaf4;--ink:#201a16;--muted:#776b62;--line:#e2d8cc;--accent:#6b4eff;--accent2:#4f38d4;--danger:#c62828;--ok:#0f7a3d;--shadow:0 8px 24px rgba(40,25,10,.08)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}.app{max-width:760px;margin:0 auto;padding:18px 14px 36px}.app-header{padding:14px 4px 10px}.app-header h1{font-size:1.35rem;margin:0}.app-header p{margin:.2rem 0 0;color:var(--muted);font-size:.9rem}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px;margin:12px 0}.label{display:block;font-weight:700;font-size:.9rem;margin:10px 0 6px}.textarea,.input,.select{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font:inherit;padding:10px 11px}.textarea{min-height:112px;resize:vertical}.textarea.small{min-height:76px}.textarea.output{min-height:90px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9rem}.row{display:flex;gap:10px}.two-cols>*{flex:1}.primary-btn,.copy-btn,.sub-btn{border:0;border-radius:999px;padding:11px 16px;font-weight:700;font:inherit}.primary-btn{width:100%;margin-top:14px;background:var(--accent);color:#fff}.primary-btn:disabled{opacity:.55}.primary-btn:active{background:var(--accent2)}.copy-btn,.sub-btn{background:#ebe7ff;color:#3725a6;margin:8px 6px 0 0}.status{min-height:1.5em;color:var(--muted);font-size:.9rem;white-space:pre-wrap}.status.ok{color:var(--ok)}.status.err{color:var(--danger)}details summary{cursor:pointer;font-weight:700}.details-inner{padding-top:12px}.output-block{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.output-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.output-title h3{margin:0;font-size:1rem}.translation{background:#fff;border:1px dashed var(--line);border-radius:12px;padding:9px 10px;font-size:.9rem;color:#3a312b;white-space:pre-wrap}.tag-preview{background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 10px;margin:8px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88rem;white-space:pre-wrap}.unmatched{color:var(--danger)}.matched{color:var(--ink)}.muted{color:var(--muted);font-size:.88rem}.pre{white-space:pre-wrap;overflow:auto;background:#241f1b;color:#fff;border-radius:12px;padding:10px;font-size:.8rem}.debug-box{margin-top:12px}.history-item{border-top:1px solid var(--line);padding:10px 0}.db-info{font-size:.86rem;color:var(--muted);margin-top:8px}.pill{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:999px;padding:2px 8px;margin:2px 4px 2px 0;font-size:.78rem}.pill.ok{border-color:#b8dfc7;color:var(--ok)}.pill.warn{border-color:#efc4c4;color:var(--danger)}@media(max-width:520px){.row{flex-direction:column}.app{padding:12px 10px 28px}.card{border-radius:14px;padding:12px}.app-header h1{font-size:1.2rem}}
+</style>
+</head>
+<body>
+<main class="app">
+<header class="app-header"><h1>SDXL Prompt Builder</h1><p>v0.5.1 Gemini / OpenAI切替 + Danbooru照合 + 外部補正辞書</p></header>
+<section class="card">
+  <label class="label" for="userInput">日本語入力</label>
+  <textarea id="userInput" class="textarea" placeholder="例：犬を散歩している\n朝の公園\n上下ジャージ\n正面からの煽り構図"></textarea>
+  <div class="row two-cols">
+    <div><label class="label" for="targetModel">対象モデル</label><select id="targetModel" class="select"><option value="wai">WAI</option><option value="noobai">NoobAI</option></select></div>
+    <div><label class="label" for="outputMode">出力形式</label><select id="outputMode" class="select"><option value="positive_negative">ポジティブ / ネガティブ</option><option value="five_category">5分類</option></select></div>
+  </div>
+  <button id="generateBtn" class="primary-btn" type="button">生成</button>
+  <p id="statusText" class="status">準備中...</p><div id="dbInfo" class="db-info"></div>
+</section>
+<section class="card" id="outputSection"><h2>出力</h2><div id="outputContainer"><p class="muted">まだ生成されていません。</p></div><details class="debug-box"><summary>AI返却JSON / 診断ログ</summary><pre id="rawJson" class="pre"></pre></details></section>
+<details class="card" id="fixedTagsDetails"><summary>固定タグ</summary><div class="details-inner"><label class="label" for="fixedPositive">ポジティブ固定タグ</label><textarea id="fixedPositive" class="textarea small" placeholder="例：masterpiece, best quality, 1boy"></textarea><label class="label" for="fixedNegative">ネガティブ固定タグ</label><textarea id="fixedNegative" class="textarea small" placeholder="例：worst quality, low quality"></textarea></div></details>
+<details class="card" id="historyDetails"><summary>履歴</summary><div class="details-inner"><div id="historyList"><p class="muted">簡易履歴を表示します。</p></div></div></details>
+<details class="card" id="apiDetails"><summary>API設定</summary><div class="details-inner"><label class="label" for="apiProvider">使用API</label><select id="apiProvider" class="select"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select><label class="label" for="geminiApiKey">Gemini API Key</label><input id="geminiApiKey" class="input" type="password" placeholder="AIza..." autocomplete="off"><label class="label" for="openaiApiKey">OpenAI API Key</label><input id="openaiApiKey" class="input" type="password" placeholder="sk-..." autocomplete="off"><p class="muted">APIキーはこの端末のブラウザ内に保存されます。使用APIを切り替えて比較できます。</p></div></details>
+</main>
+<script>
+(function(){
+'use strict';
+const STORAGE='sdxlPromptBuilderV05.'; const GEMINI_MODEL='gemini-2.5-flash'; const OPENAI_MODEL='gpt-4.1-mini';
+const fields=['expression','gaze','clothing','pose','object','background','atmosphere','composition','negative'];
+const els={input:document.getElementById('userInput'),model:document.getElementById('targetModel'),mode:document.getElementById('outputMode'),btn:document.getElementById('generateBtn'),status:document.getElementById('statusText'),dbInfo:document.getElementById('dbInfo'),out:document.getElementById('outputContainer'),raw:document.getElementById('rawJson'),fp:document.getElementById('fixedPositive'),fn:document.getElementById('fixedNegative'),provider:document.getElementById('apiProvider'),gkey:document.getElementById('geminiApiKey'),okey:document.getElementById('openaiApiKey'),hist:document.getElementById('historyList')};
+let tagDb=[], tagMap=new Map(), dbSource='embedded fallback';
+let tagCorrections={}, correctionMap=new Map(), correctionSource='none';
+const FALLBACK_DB=[
+['black_shirt',180000],['white_shirt',210000],['tracksuit',52000],['sneakers',82000],['yukata',110000],['kimono',260000],['double-breasted_suit',9500],['black_gloves',98000],['white_gloves',87000],['smile',2500000],['faint_smile',160000],['soft_smile',42000],['closed_eyes',1200000],['half-closed_eyes',420000],['half_lidded_eyes',300000],['narrowed_eyes',140000],['looking_away',520000],['looking_at_viewer',1900000],['looking_to_the_side',76000],['profile',360000],['side_profile',33000],['side_view',180000],['upper_body',1200000],['bust',160000],['walking',490000],['sitting',1700000],['seiza',65000],['crossed_legs',280000],['standing',1200000],['holding',1600000],['holding_cup',82000],['coffee_cup',95000],['beer_can',19000],['dog',420000],['leash',26000],['dog_leash',5300],['park',310000],['morning',220000],['sunlight',430000],['window',830000],['large_window',21000],['living_room',115000],['japanese_room',40000],['tatami',120000],['bedroom',330000],['futon',85000],['cafe',310000],['chair',850000],['table',920000],['potted_plant',120000],['heart_background',22000],['cat_ears',780000],['paw_pose',12000],['low_angle',230000],['front_view',240000],['depth_of_field',420000],['highres',1200000],['absurdres',900000]
+].map(([tag,post_count])=>({tag,normalized_tag:normalize(tag),category:'general',post_count}));
+function $(id){return document.getElementById(id)} function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function setStatus(msg,type=''){els.status.textContent=msg;els.status.className='status '+type} function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function normalize(s){return String(s||'').toLowerCase().replace(/[\s_\-]/g,'').trim()}
+function buildTagMap(data){const map=new Map();for(const row of data||[]){if(!row||!row.tag)continue;const n=row.normalized_tag||normalize(row.tag);const rec={...row,normalized_tag:n};if(!map.has(n))map.set(n,[]);map.get(n).push(rec)}return map}
+function buildCorrectionMap(obj){const map=new Map();for(const [from,to] of Object.entries(obj||{})){const key=normalize(from);const vals=Array.isArray(to)?to:[to];map.set(key,vals.filter(Boolean).map(String))}return map}
+async function loadCorrections(){tagCorrections={};correctionMap=new Map();correctionSource='none';try{const res=await fetch('data/tag_corrections.json',{cache:'no-store'});if(res.ok){const data=await res.json();if(data&&typeof data==='object'&&!Array.isArray(data)){tagCorrections=data;correctionMap=buildCorrectionMap(data);correctionSource='data/tag_corrections.json'}}}catch(e){correctionSource='none'}}
+async function loadDb(){tagDb=FALLBACK_DB;try{const res=await fetch('data/danbooru_tags.json',{cache:'no-store'});if(res.ok){const data=await res.json();if(Array.isArray(data)&&data.length){tagDb=data;dbSource='data/danbooru_tags.json'}}}catch(e){dbSource='embedded fallback'}tagMap=buildTagMap(tagDb);await loadCorrections();els.dbInfo.innerHTML=`<span class="pill ok">DB: ${esc(dbSource)}</span><span class="pill">${tagDb.length} tags</span><span class="pill ${correctionSource==='none'?'warn':'ok'}">Corrections: ${esc(correctionSource)}</span><span class="pill">${correctionMap.size} rules</span>`}
+function save(){for(const [k,el] of Object.entries({input:els.input,model:els.model,mode:els.mode,fp:els.fp,fn:els.fn,provider:els.provider,gkey:els.gkey,okey:els.okey})){localStorage.setItem(STORAGE+k,el.value||'')}}
+function load(){for(const [k,el] of Object.entries({input:els.input,model:els.model,mode:els.mode,fp:els.fp,fn:els.fn,provider:els.provider,gkey:els.gkey,okey:els.okey})){const v=localStorage.getItem(STORAGE+k);if(v!==null)el.value=v}}
+function splitTags(s){return String(s||'').split(',').map(x=>x.trim()).filter(Boolean)} function fixedSet(){return new Set([...splitTags(els.fp.value),...splitTags(els.fn.value)].map(normalize))}
+function sysPrompt(){return `あなたはSDXL画像生成用プロンプト変換アシスタントです。
+
+ユーザーの日本語入力を、自然な英訳ではなく、SDXL画像生成で使いやすいDanbooru風タグへ変換してください。
+
+出力は必ずJSONのみ。Markdown、説明文、コードブロックは禁止。
+
+最重要方針：
+
+- DB一致率より、ユーザーが明示した要素を漏らさないことを優先する。
+- 自然な英訳を目的にしない。
+- ただし、ユーザーが明示した具体要素は勝手に削除・圧縮・置換しない。
+- 抽象語・感情語・雰囲気語だけを、画像上に見える視覚要素へ分解する。
+- Danbooruタグとして存在しそうな短いタグを優先する。
+- 説明的な英語フレーズはなるべく避けるが、そのためにユーザー指定要素を削除してはいけない。
+- primaryには、最もDanbooruタグらしい候補を入れる。
+- alternativesには、Danbooruタグとして存在しそうな表記違い・近い視覚タグ・分解候補を4件入れる。
+- primaryとalternativesは重複禁止。
+- alternativesは必ず4件。
+
+【入力要素の保持ルール】
+
+ユーザー入力の各行、または各意味単位につき、最低1つ以上のタグ要素を出力する。
+
+例：
+
+後ろ姿
+スーツ
+威圧的
+
+この場合、以下の3系統を必ずすべて出力する。
+
+- 後ろ姿に対応するタグ
+- スーツに対応するタグ
+- 威圧的に対応するタグ
+
+スーツを jacket だけに圧縮してはいけない。
+威圧的だけを出して、後ろ姿やスーツを省略してはいけない。
+
+【保持対象】
+
+以下はユーザーが明示的に指定した内容として扱い、意味変換せずDanbooruタグ候補として保持する。
+
+- 構図
+- カメラアングル
+- 顔の向き
+- 体の向き
+- ポーズ
+- 衣装
+- 髪型
+- 装飾品
+- 小物
+- 背景
+- 場所
+- 時間帯
+- 人数
+- キャラクター属性
+
+これらは抽象化・再解釈しない。
+推論対象より優先する。
+最終出力から省略してはいけない。
+
+例：
+
+横顔 → profile, side_view, side_profile
+
+後ろ姿 → from_behind, back, looking_back
+
+バストアップ → upper_body, bust, portrait
+
+煽り → low_angle, from_below
+
+俯瞰 → from_above
+
+黒シャツ → black_shirt
+
+スーツ → suit, formal_clothes, dress_shirt, necktie
+
+ピアス → earrings, ear_piercing
+
+長髪 → long_hair
+
+公園 → park
+
+【推論対象】
+
+以下だけを、画像上で観測できる視覚要素へ分解する。
+
+- 感情
+- 雰囲気
+- 印象
+- 抽象的形容詞
+- 心理状態
+
+例：
+
+物憂げ
+→ half-closed_eyes, looking_away, sad, expressionless
+
+疲れた
+→ tired, sleepy, bags_under_eyes, half-closed_eyes
+
+妖艶
+→ seductive_smile, half-closed_eyes, looking_at_viewer, parted_lips
+
+威圧的
+→ narrowed_eyes, looking_down, smirk, serious
+
+神秘的
+→ shadow, glowing, mysterious, dramatic_lighting
+
+優雅
+→ elegant, graceful, refined
+
+【説明的タグの扱い】
+
+説明的な英語フレーズは、可能なら一般的なDanbooruタグへ寄せる。
+
+ただし、説明的タグを避けるために、ユーザー指定要素そのものを削除してはいけない。
+
+例：
+
+business_suit → suit
+
+formal_wear → formal_clothes または suit
+
+back_view → from_behind
+
+tie → necktie
+
+profile_gaze → profile または looking_to_the_side
+
+profile_pose → profile
+
+hair_tucked_behind_ear → hair_behind_ear
+
+melancholic_expression → half-closed_eyes, looking_away, expressionless
+
+melancholic_atmosphere → shadow, looking_away, half-closed_eyes
+
+【保持対象の必須出力例】
+
+横顔
+→ profile を必ず出力する。
+looking_away のみで代替してはいけない。
+
+横顔 + 物憂げ
+→ profile と looking_away の両方を出力する。
+
+後ろ姿
+→ from_behind を必ず出力する。
+back_view のみは避ける。
+
+後ろ姿 + 威圧的
+→ from_behind と narrowed_eyes / looking_down / serious の両方を出力する。
+
+バストアップ
+→ upper_body を必ず出力する。
+
+黒シャツ
+→ black_shirt を必ず出力する。
+
+スーツ
+→ suit を必ず出力する。
+jacket のみで代替してはいけない。
+
+ピアス
+→ earrings を必ず出力する。
+
+長髪
+→ long_hair を必ず出力する。
+
+【出力前チェック】
+
+最終出力前に以下を確認する。
+
+1. ユーザー入力の各行・各意味単位を一覧化する
+2. 保持対象と推論対象に分類する
+3. 保持対象が最終出力にすべて含まれているか確認する
+4. 欠けている保持対象があれば追加する
+5. 推論タグのみで保持対象を代替していないか確認する
+6. 説明的な英語フレーズがある場合は、可能な範囲で一般的なDanbooruタグへ置換する
+7. ただし、置換によってユーザー指定要素を削除してはいけない
+
+カテゴリ：
+
+- expression: 表情
+- gaze: 視線
+- clothing: 衣装
+- pose: ポーズ・身体姿勢
+- object: 小物・持ち物・周辺物
+- background: 背景・場所
+- atmosphere: 雰囲気・光・空気感
+- composition: 構図・カメラ・画角
+- negative: 場面特有のネガティブプロンプト
+
+各要素は必ずこの形式：
+
+{"meaning_ja":"日本語での意味","primary":"Danbooru風タグ候補","alternatives":["候補1","候補2","候補3","候補4"],"translation_ja":"primaryの日本語直訳"}
+
+抽象語の変換例：
+
+- 物憂げ → sad, looking_away, half-closed_eyes, expressionless, downcast_eyes
+- 寂しそう → sad, lonely, looking_away, downcast_eyes, expressionless
+- 疲れた → tired, sleepy, half-closed_eyes, bags_under_eyes, exhausted
+- 威圧的 → narrowed_eyes, looking_down, smirk, serious, intimidating
+- 妖艶 → seductive_smile, half-closed_eyes, looking_at_viewer, parted_lips, alluring
+- 神秘的 → mysterious, glowing, shadow, dramatic_lighting, dark_background
+- 優雅 → elegant, refined, graceful, formal, calm
+
+具体語の変換例：
+
+- 黒シャツ → black_shirt, shirt, collared_shirt, black_clothes, dark_shirt
+- 白シャツ → white_shirt, shirt, collared_shirt, dress_shirt, white_clothes
+- 横顔 → profile, side_view, side_profile
+- 後ろ姿 → from_behind, back, looking_back
+- バストアップ → upper_body, bust, portrait, close-up, medium_shot
+- 髪を耳にかけている → hair_behind_ear, hair_tucked_behind_ear, ear, visible_ear, hair_over_shoulder
+- 犬を散歩 → walking, dog, leash, dog_leash, holding_leash
+- 朝の公園 → park, morning, outdoors, sunlight, trees
+- ジャージ → tracksuit, sportswear, track_jacket, track_pants, sneakers
+- スーツ → suit, formal_clothes, dress_shirt, necktie, blazer
+- ピアス → earrings, ear_piercing, jewelry
+- 長髪 → long_hair, very_long_hair, hair
+
+補完ルール：
+
+- ユーザーが明示した内容を最優先する。
+- 高確率で付随する視覚要素のみ補完してよい。
+- 明示されていない衣装、場所、構図、キャラクター設定を勝手に追加しない。
+- 「白シャツ」から office を追加しない。
+- 「コーヒー」から cafe を追加しない。
+- 「スーツ」から meeting_room を追加しない。
+
+固定タグ：
+
+- 固定タグに含まれる内容や近い意味のタグはなるべく出力しない。
+
+negative：
+
+- 必要な場合のみ生成する。
+- 品質系・性別維持・キャラ維持・LoRA維持のネガティブは生成しない。
+- 場面特有の構図崩れ、視線崩れ、ポーズ崩れ、衣装崩れのみ生成する。
+
+必ず次のJSON形式で返す：
+
+{"expression":[],"gaze":[],"clothing":[],"pose":[],"object":[],"background":[],"atmosphere":[],"composition":[],"negative":[]}`;}function modelInstruction(){return els.model.value==='wai'?`WAI向け: 抽象語より見た目に直結するタグを優先。表情は視覚的要素へ変換。視線指定は強めに反映。服装・小物・ポーズは短く具体的に。文学的表現は控えめ。`:`NoobAI向け: 見た目タグ中心だが雰囲気タグも少し残してよい。自然文寄りの短い英語フレーズも許可。複雑な動作は複数の短いタグへ分解。`}
+function userMessage(){return `MODEL_TYPE: ${els.model.value}\nOUTPUT_MODE: ${els.mode.value}\nFIXED_POSITIVE_TAGS:\n${els.fp.value||'(none)'}\nFIXED_NEGATIVE_TAGS:\n${els.fn.value||'(none)'}\nUSER_INPUT:\n${els.input.value}`}
+function extractTextFromGemini(data){return data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('\n')||''} function extractTextFromOpenAI(data){return data?.choices?.[0]?.message?.content||''} function cleanJsonText(t){return String(t||'').replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```$/,'').trim()}
+function fallbackJsonFromText(text){const lines=String(text).split(/[\n、。]+/).map(x=>x.trim()).filter(Boolean);const arr=lines.slice(0,8).map(x=>({meaning_ja:x,primary:x,alternatives:[x+' prompt',x+' detail',x+' scene',x+' atmosphere'],translation_ja:x}));return {expression:[],gaze:[],clothing:[],pose:[],object:[],background:[],atmosphere:arr,composition:[],negative:[]}}
+async function fetchGeminiOnce(){const key=els.gkey.value.trim();if(!key)throw new Error('Gemini API Keyが未入力です。API設定を開いて入力してください。');const body={contents:[{role:'user',parts:[{text:sysPrompt()+"\n\n"+modelInstruction()+"\n\n"+userMessage()}]}],generationConfig:{temperature:0.35,responseMimeType:'application/json'}};const url=`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const text=await res.text();if(!res.ok){const err=new Error(`Gemini APIエラー: HTTP ${res.status}\n${text.slice(0,800)}`);err.status=res.status;throw err}let data;try{data=JSON.parse(text)}catch(e){throw new Error('Gemini応答をJSONとして読めませんでした: '+text.slice(0,500))}return data}
+async function callGeminiWithRetry(){let last;for(let attempt=1;attempt<=3;attempt++){try{if(attempt>1)setStatus(`Geminiが混雑しています。再試行 ${attempt}/3 ...`);const data=await fetchGeminiOnce();const aiText=extractTextFromGemini(data);if(!aiText)throw new Error('Geminiからテキストが返りませんでした。');let parsed;try{parsed=JSON.parse(cleanJsonText(aiText))}catch(e){parsed=fallbackJsonFromText(aiText)}return {parsed,raw:data,aiText}}catch(e){last=e;if(e.status===503||e.status===429){await sleep(attempt*3000);continue}throw e}}throw last}
+async function fetchOpenAIOnce(){const key=els.okey.value.trim();if(!key)throw new Error('OpenAI API Keyが未入力です。API設定を開いて入力してください。');const body={model:OPENAI_MODEL,response_format:{type:'json_object'},messages:[{role:'system',content:sysPrompt()+'\n\n'+modelInstruction()},{role:'user',content:userMessage()}],temperature:0.35,store:false};const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify(body)});const text=await res.text();if(!res.ok){const err=new Error(`OpenAI APIエラー: HTTP ${res.status}\n${text.slice(0,800)}`);err.status=res.status;throw err}let data;try{data=JSON.parse(text)}catch(e){throw new Error('OpenAI応答をJSONとして読めませんでした: '+text.slice(0,500))}return data}
+async function callOpenAIWithRetry(){let last;for(let attempt=1;attempt<=3;attempt++){try{if(attempt>1)setStatus(`OpenAIが混雑しています。再試行 ${attempt}/3 ...`);const data=await fetchOpenAIOnce();const aiText=extractTextFromOpenAI(data);if(!aiText)throw new Error('OpenAIからテキストが返りませんでした。');let parsed;try{parsed=JSON.parse(cleanJsonText(aiText))}catch(e){parsed=fallbackJsonFromText(aiText)}return {parsed,raw:data,aiText}}catch(e){last=e;if(e.status===429||e.status===500||e.status===502||e.status===503){await sleep(attempt*3000);continue}throw e}}throw last}
+function correctionCandidates(s){const out=[];const list=correctionMap.get(normalize(s));if(list){for(const v of list){out.push(v)}}return out}
+function candidateStrings(item){const base=(typeof item==='string')?[item]:[item?.primary||'',...(Array.isArray(item?.alternatives)?item.alternatives:[])].filter(Boolean);const out=[];const seen=new Set();for(const c of base){for(const v of correctionCandidates(c)){const n=normalize(v);if(n&&!seen.has(n)){seen.add(n);out.push(v)}}const n=normalize(c);if(n&&!seen.has(n)){seen.add(n);out.push(c)}}return out}
+function matchItem(item){const primary=(typeof item==='string')?item:(item?.primary||'');const translation=(typeof item==='string')?item:(item?.translation_ja||item?.meaning_ja||item?.primary||'');const candidates=candidateStrings(item);let matches=[];for(const c of candidates){const n=normalize(c);const list=tagMap.get(n)||[];matches.push(...list.map(row=>({...row,matched_candidate:c})))}if(matches.length){matches.sort((a,b)=>(b.post_count||0)-(a.post_count||0));const best=matches[0];return {tag:best.tag,translation,matched:true,source:primary,post_count:best.post_count||0,candidates,corrected_from:best.matched_candidate!==primary?primary:''}}return {tag:primary,translation,matched:false,source:primary,post_count:0,candidates}}
+function collect(json){const fixed=fixedSet();const positive=[];const negative=[];const byCat={};for(const f of fields){const list=Array.isArray(json?.[f])?json[f]:[];byCat[f]=[];for(const item of list){const o=matchItem(item);if(!o.tag)continue;if(fixed.has(normalize(o.tag))||fixed.has(normalize(o.source)))continue;byCat[f].push(o);if(f==='negative')negative.push(o);else positive.push(o)}}return {positive:dedupe(positive),negative:dedupe(negative),byCat:Object.fromEntries(Object.entries(byCat).map(([k,v])=>[k,dedupe(v)]))}}
+function dedupe(list){const seen=new Set();const out=[];for(const x of list){const n=normalize(x.tag);if(!n||seen.has(n))continue;seen.add(n);out.push(x)}return out} function joinTags(list){return list.map(x=>x.tag).join(', ')} function renderPreview(list){return list.map(x=>`<span class="${x.matched?'matched':'unmatched'}">${esc(x.tag)}</span>`).join(', ')} function renderTrans(list){return list.map(x=>`<span class="${x.matched?'matched':'unmatched'}">${esc(x.translation)}</span>`).join(' / ')}
+function block(title,list,id){return `<div class="output-block"><div class="output-title"><h3>${title}</h3><button class="copy-btn" type="button" data-copy="${id}">コピー</button></div><div class="tag-preview">${renderPreview(list)||'<span class="muted">なし</span>'}</div><textarea id="${id}" class="textarea output">${esc(joinTags(list))}</textarea><label class="label">日本語確認</label><div class="translation">${renderTrans(list)||'<span class="muted">なし</span>'}</div><p class="muted">黒字: DB一致 / 赤字: DB未一致</p></div>`}
+function render(json){const c=collect(json);if(els.mode.value==='five_category'){const map=[['表情',[...c.byCat.expression,...c.byCat.gaze]],['衣装',c.byCat.clothing],['背景',c.byCat.background],['状態',[...c.byCat.pose,...c.byCat.object]],['ネガティブ',c.byCat.negative]];els.out.innerHTML=map.map((m,i)=>block(m[0],m[1],`out_${i}`)).join('')}else{els.out.innerHTML=block('Positive',c.positive,'out_pos')+block('Negative',c.negative,'out_neg')}document.querySelectorAll('[data-copy]').forEach(btn=>btn.addEventListener('click',()=>{const id=btn.getAttribute('data-copy');const v=$(id)?.value||'';navigator.clipboard?.writeText(v).then(()=>setStatus('コピーしました。','ok')).catch(()=>setStatus('コピーできませんでした。テキストを選択してコピーしてください。','err'))}));addHistory(c)}
+function addHistory(c){let hist=[];try{hist=JSON.parse(localStorage.getItem(STORAGE+'history')||'[]')}catch(e){}hist.unshift({date:new Date().toLocaleString(),input:els.input.value,positive:joinTags(c.positive),negative:joinTags(c.negative),mode:els.mode.value});hist=hist.slice(0,50);localStorage.setItem(STORAGE+'history',JSON.stringify(hist));renderHistory()}
+function renderHistory(){let hist=[];try{hist=JSON.parse(localStorage.getItem(STORAGE+'history')||'[]')}catch(e){}if(!hist.length){els.hist.innerHTML='<p class="muted">履歴はまだありません。</p>';return}els.hist.innerHTML=hist.map((h,i)=>`<div class="history-item"><strong>${esc(h.date)}</strong> <span class="pill">${esc(h.mode||'')}</span><br><span class="muted">${esc((h.input||'').slice(0,60))}</span><br><small>Positive: ${esc((h.positive||'').slice(0,90))}</small><br><button class="sub-btn" type="button" data-restore="${i}">この内容で再編集</button></div>`).join('');document.querySelectorAll('[data-restore]').forEach(btn=>btn.addEventListener('click',()=>{const h=hist[Number(btn.dataset.restore)];if(!h)return;els.input.value=h.input||'';els.mode.value=h.mode||'positive_negative';save();window.scrollTo({top:0,behavior:'smooth'});setStatus('履歴の入力文を復元しました。','ok')}))}
+async function onGenerate(){setStatus('生成ボタンが押されました。入力とAPIキーを確認しています...');els.raw.textContent='';save();if(!els.input.value.trim()){setStatus('日本語入力が空です。','err');return}els.btn.disabled=true;els.btn.textContent='生成中...';try{const provider=els.provider?.value||'gemini';setStatus(provider==='openai'?'OpenAI APIへ問い合わせています...':'Gemini APIへ問い合わせています...');const result=provider==='openai'?await callOpenAIWithRetry():await callGeminiWithRetry();els.raw.textContent='[Provider]\n'+provider+'\n\n[AI text]\n'+result.aiText+'\n\n[Parsed]\n'+JSON.stringify(result.parsed,null,2)+'\n\n[Raw]\n'+JSON.stringify(result.raw,null,2);render(result.parsed);setStatus('生成しました。候補5件照合済みです。','ok')}catch(e){console.error(e);els.raw.textContent=String(e&&e.stack?e.stack:e);setStatus(String(e.message||e),'err')}finally{els.btn.disabled=false;els.btn.textContent='生成'}}
+async function init(){load();await loadDb();renderHistory();['input','change'].forEach(ev=>{[els.input,els.model,els.mode,els.fp,els.fn,els.provider,els.gkey,els.okey].forEach(el=>el.addEventListener(ev,save))});els.btn.addEventListener('click',onGenerate);setStatus('準備完了。API設定でGemini / OpenAIを選んで生成できます。','ok')}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+</body>
+</html>

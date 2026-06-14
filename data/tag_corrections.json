@@ -1,0 +1,20 @@
+{
+  "tie": "necktie",
+  "back_view": "from_behind",
+  "business_suit": "suit",
+  "formal_wear": "formal_clothes",
+  "profile_gaze": "profile",
+  "profile_pose": "profile",
+  "side_profile": "profile",
+  "hair_tucked_behind_ear": "hair_behind_ear",
+  "melancholic_expression": [
+    "half-closed_eyes",
+    "looking_away",
+    "expressionless"
+  ],
+  "melancholic_atmosphere": [
+    "shadow",
+    "looking_away",
+    "half-closed_eyes"
+  ]
+}
